@@ -66,6 +66,7 @@ class Event:
         allMatches = TBAPull('event/'+self.eventKey+'/matches/keys')
         quals = [Match(match) for match in allMatches if 'f' not in match]
         finals = [Match(match) for match in allMatches if 'f' in match]
+        quals.sort()
         self.quals = quals
         self.finals = finals
     #def participation(self):
@@ -97,7 +98,24 @@ class Match:
         self.red = [removeFRC(x) for x in matchData["alliances"]['blue']['team_keys']]
         self.blueScore = matchData['score_breakdown']['blue']
         self.redScore = matchData['score_breakdown']['red']
+        self.winner = matchData['winning_alliance']
         if matchData['actual_time']==None:
             self.happened = False
         else:
             self.happened = True
+    def __eq__(self, second):
+        if self.eventKey == second.eventKey:
+            if self.matchKey == second.matchKey:
+                return True
+            else:
+                return False
+        else:
+            raise Exception('Must be from same event')
+    def __lt__(self, second):
+        if self.eventKey == second.eventKey:
+            if self.matchType == second.matchType == 'qm':
+                return(int(self.matchNo)<int(second.matchNo))
+            else:
+                raise Exception('Comparison between match types of ther than qualifiers not implemented')
+        else:
+            raise Exception('Must be from same event')
