@@ -1,65 +1,107 @@
 import numpy as np
 import scipy as sp
 import time
-from scipy import sparse
 from scipy import linalg
 import requests
 import json
-def coolData(eventKey):
-    authorization = {'X-TBA-Auth-Key':'y0P1WCKJgxgQWgov5mSK2LaR8tRhthEeZp9puDNz045CkNm8VUhuwPw0E2qOllFD'}
-    test = requests.get('http://www.thebluealliance.com/api/v3/event/'+eventKey+'/teams/keys', headers=authorization)
-    teamKeys = str(test.content)
-    def removeNewLine(string): #converts JSON of <something> keys API to a python data
-        length = len(string) #this function may not be needed
-        temp1 = string[2:length-1]
-        temp2 = temp1.replace('\\n','')
-        return(json.loads(temp2))
-    teamsList = removeNewLine(teamKeys)
-    noTeams = len(teamsList)
-    #counts the number of qualifiers at event
-    matches = str((requests.get('http://www.thebluealliance.com/api/v3/event/' + eventKey + '/matches/keys', headers=authorization)).content)
-    count = True
-    index = 1
-    while count:
-        index += 1
-        count = matches.count(str(index))
-    noQual = index-1
-    eventData = []
-    start2 = time.time()
-    for x in range(1, noQual+1): #this just downloads and stores all the match data in a big list so it can be accessed more easily later
-        eventData.append(removeNewLine(str((requests.get('http://www.thebluealliance.com/api/v3/match/' + eventKey + '_qm' + str(x), headers=authorization)).content)))
-    #put all the different scoring metrics you care about in below array
-    allMetrics = {'totalPoints':'overallScore', 'autoRunPoints':'runVector', 'autoSwitchOwnershipSec':'switchAuto', 'autoScaleOwnershipSec':'scaleAuto','teleopSwitchOwnershipSec':'switchTele', 'teleopScaleOwnershipSec':'scaleTele', 'vaultPoints':'vaultVector', 'foulPoints':'oof', 'climbPoints':'climbVector'}
-    syntheticOverallContributionWeights = [0, 1, 2, 2, 1, 1, 1, -1, 1] # edit this to calculate SOC
-    for metrics in allMetrics: #if a metric has weird needs, use "if else" to modify below loop
-        allMetrics[metrics] = np.zeros((2*noQual, 1))
-    participationMatrix = np.zeros((noQual*2, noTeams*2))#denotes which teams were in which matches
-    def climbPointsNoLevitate(match, color): #eliminates points from levitate
-        total = 0
-        translate = {'None':0, 'Levitate':0, 'Parking':5,'Climbing':30, 'Unknown':0}
-        for x in range(0,3):
-            total += translate[eventData[match]['score_breakdown'][str(color)]['endgameRobot'+str(x+1)]]
-        return(total)
-    participationMatrix = np.zeros((noQual*2, noTeams*2)) # denotes which teams were in which matches
-    reducedMatrix = np.zeros((noQual*2, noTeams))
-    colors = ['blue', 'red']
-    for match in range(0, noQual): #if a metric has weird needs, use "if else" to modify below loop
-        for x in range(0,2):
-            for teams in range(0,3): # put team specific stuff in this section, make sure to duplicate
-                    teamKey = eventData[match]['alliances'][colors[x]]['team_keys'][teams]
-                    participationMatrix[match+x*noQual, teamsList.index(teamKey)] = 1
-                    reducedMatrix[match+x*noQual, teamsList.index(teamKey)] = 1
-                    participationMatrix[match+noQual-x*noQual, noTeams+teamsList.index(teamKey)] = -1
-            for metrics in allMetrics:
-                if metrics=='foulPoints':
-                    allMetrics[metrics][match+noQual-x*noQual] = eventData[match]['score_breakdown'][colors[x]][metrics]
-                elif metrics=='climbPoints':
-                    allMetrics[metrics][match +x*noQual] = climbPointsNoLevitate(match, colors[x])
-                else:
-                    allMetrics[metrics][match+x*noQual] = eventData[match]['score_breakdown'][colors[x]][metrics]
-    pseudoInverse = linalg.pinv(reducedMatrix)
-    teamDataArray = np.zeros((noTeams, 0))
-    for metric in allMetrics: # '@' is what numpy uses for matrix multiplication
-        teamDataArray = np.concatenate((teamDataArray, pseudoInverse@allMetrics[metric]), axis=1)
-    for x in range(0, noTeams):
-        print(teamsList[x], np.dot(teamDataArray[x], syntheticOverallContributionWeights), teamDataArray[x])
+auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
+def removeFRC(teamKey):
+    return int(teamKey[3:])
+def removeNewLine(string): #converts JSON of <something> keys API to a python data
+    return(json.loads(string[2:len(string)-1].replace('\\n','').replace("\\",'')))
+def TBAPull(directory): #pulls specific info from tba api and makes it into python usable format
+    return(removeNewLine(str(requests.get('http://www.thebluealliance.com/api/v3/'+directory,headers=auth).content)))
+class Event:
+    #fill these in for all years later
+    #metrics where alliance partners "shouldn't" have any significant impact such as crossing line in auto 
+    teamMetrics = {2018:[],
+                   2019:[],
+                   2020:['initLineRobot','endgameRobot']
+                  }
+    #sources of points where defence is judged to be moot due to causing
+    nonContestedMetrics = {2018:[],
+                           2019:[],
+                           2020:['autoCellsBottom','autoCellsOuter','autoCellsInner','autoCellPoints','endgameRungIsLevel','adjustPoints','controlPanelPoints','autoPoints','endgamePoints']
+                          }
+    #sources of points where defence could be reasonably played, everything else
+    allianceMetrics = {2018:[],
+                        2019:[],
+                        2020:['teleopCellsBottom','teleopCellsOuter','teleopCellsInner']
+                      }
+    #converts boolean data from TBA to numbers
+    #can't fill out until I know what the possible responses for 2020 are
+    tbaTranslation = {2018:{'climbToPoint':{'None':0, 'Levitate':0, 'Parking':5,'Climbing':30, 'Unknown':0},'autoRunToPoints':{'None':0, 'AutoRun':5}},
+                      2019:{'endPoints':{'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':12},'bayToPoints':{'None':0,'Panel':2,'PanelAndCargo':5},'preBayToPoints':{'Cargo':0,'Panel':2},'preLevelToPoints':{'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':6},'lineToPoints':{'None':0,'CrossedHabLineInSandstorm':1}},
+                      2020:{}
+                     }
+    weights = {2018:[0, 2, 2, 1, 1, 1, -1, 1, 1],
+               2019:[1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,1,1,1,1,0,0,-1,0,0,1,0,1],
+               2020:[ ]
+              }
+    def __init__(self, year, key):
+        if type(year)!=int:
+            raise Exception('Years are ints')
+        elif year not in range(2019,2021):
+            raise Exception('Year not implemented')
+        elif type(key)!=str:
+            raise Exception('Key must be string')
+        #add something to make sure the year key combo is valid
+        self.eventKey = str(year)+key
+        self.nonContestedMetrics = self.nonContestedMetrics[year]
+        self.allianceMetrics = self.allianceMetrics[year]
+        self.teamMetrics = self.teamMetrics[year]
+        self.tbaTranslation = self.tbaTranslation[year]
+        self.weights = self.weights[year]
+        eventKey = key+str(year)
+    #def rollCall(self):
+    def teams(self):
+        #figure out a better way to change all elements of list than creating new one
+        teamsPre = TBAPull('event/'+self.eventKey+'/teams/keys')
+        teamsList = [removeFRC(x) for x in teamsPre]
+        teamsList.sort()
+        self.teamsList = teamsList
+        self.noTeams = len(teamsList)
+    def matches(self):
+        allMatches = TBAPull('event/'+self.eventKey+'/matches/keys')
+        quals = []
+        finals = []
+        for match in allMatches:
+            if 'f' in matches:
+                pass
+                finals.append(match(match))
+            else:
+                quals.append(match(match))
+        self.quals = quals
+        self.finals = finals
+    #def participation(self):
+class Match:
+    auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
+    def __init__(self, matchKey):
+        matchData = TBAPull('match/'+matchKey)
+        split = matchKey.split('_')
+        #rename temp
+        temp = split[1]
+        #the handling of these case feels really awful
+        if 'sf' in temp:
+            self.matchType = 'sf'
+            self.matchNo = temp[2:]
+        elif 'qf' in temp:
+            self.matchType = 'sf'
+            self.matchNo = temp[2:]
+            
+        elif 'f' in temp:
+            self.matchType = 'f'
+            self.matchNo = temp[1:]
+        else:
+            self.matchType = 'qf'
+            self.matchNo = temp[2:]
+        self.eventKey = split[0]
+        self.blue = [removeFRC(x) for x in matchData["alliances"]['blue']['team_keys']]
+        self.red = [removeFRC(x) for x in matchData["alliances"]['blue']['team_keys']]
+        self.blueScore = matchData['score_breakdown']['blue']
+        self.redScore = matchData['score_breakdown']['red']
+        if matchData['actual_time']==None:
+            self.happened = False
+        else:
+            self.happened = True
+
