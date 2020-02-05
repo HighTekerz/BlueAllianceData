@@ -13,6 +13,7 @@ def removeNewLine(string): #converts JSON of <something> keys API to a python da
 def TBAPull(directory): #pulls specific info from tba api and makes it into python usable format
     return(removeNewLine(str(requests.get('http://www.thebluealliance.com/api/v3/'+directory,headers=auth).content)))
 class Event:
+    colors = ['blue','red']
     #fill these in for all years later
     #metrics where alliance partners "shouldn't" have any significant impact such as crossing line in auto 
     teamMetrics = {2018:[],
@@ -67,9 +68,21 @@ class Event:
         quals = [Match(match) for match in allMatches if 'f' not in match]
         finals = [Match(match) for match in allMatches if 'f' in match]
         quals.sort()
+        self.noQuals = len(quals)
         self.quals = quals
         self.finals = finals
-    #def participation(self):
+    def participation(self): #creates incidence matrix for teams and events
+        #todo, determine whether any teams were absent
+        blueParticipation = np.zeros((self.noQuals,self.noTeams))
+        redParticipation = np.zeros((self.noQuals,self.noTeams))
+        for match in self.quals:
+            for team in match.blue:
+                blueParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
+        for match in self.quals:
+            for team in match.red:
+                redParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
+        self.blueMatrix = blueParticipation
+        self.redMatrix = redParticipation
 class Match:
     auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
     def __init__(self, matchKey):
@@ -116,7 +129,7 @@ class Match:
             if self.matchType == second.matchType == 'qm':
                 return(int(self.matchNo)<int(second.matchNo))
             else:
-                raise Exception('Comparison between match types of ther than qualifiers not implemented')
+                raise Exception('Comparison between match types other than qualifiers not implemented')
         else:
             raise Exception('Must be from same event')
 class Team: #more functionality will be added eventually but I'm not sure what
