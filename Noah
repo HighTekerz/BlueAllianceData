@@ -54,16 +54,26 @@ class Event:
         self.teamMetrics = self.teamMetrics[year]
         self.tbaTranslation = self.tbaTranslation[year]
         self.weights = self.weights[year]
-        eventKey = key+str(year)
-    #def rollCall(self):
+        #create a bunch of empty variable so i can test if they are none instead of checking if they exist
+        self.teamsList = None
+        self.noTeams = None
+        self.noQuals = None
+        self.quals = None
+        self.finals = None
+        self.blueMatrix = None
+        self.redMatrix = None       
     def teams(self):
-        #figure out a better way to change all elements of list than creating new one
+        if self.noTeams!=None:
+            return(teamsList, noTeams)
         teamsPre = TBAPull('event/'+self.eventKey+'/teams/keys')
         teamsList = [removeFRC(x) for x in teamsPre]
         teamsList.sort()
         self.teamsList = teamsList
         self.noTeams = len(teamsList)
+        return(self.teamsList,self.noTeams)
     def matches(self):
+        if self.noQuals!=None:
+            return(quals,finals,noQuals)
         allMatches = TBAPull('event/'+self.eventKey+'/matches/keys')
         quals = [Match(match) for match in allMatches if 'f' not in match]
         finals = [Match(match) for match in allMatches if 'f' in match]
@@ -71,11 +81,17 @@ class Event:
         self.noQuals = len(quals)
         self.quals = quals
         self.finals = finals
+        return(self.quals,self.finals,self.noQuals)
     def participation(self): #creates incidence matrix for teams and events
+        if self.blueMatrix!=None:
+            return(blueMatrix,redMatrix)
         #todo, determine whether any teams were absent
+        self.matches()
+        self.teams()
         blueParticipation = np.zeros((self.noQuals,self.noTeams))
         redParticipation = np.zeros((self.noQuals,self.noTeams))
         for match in self.quals:
+            match.score()
             for team in match.blue:
                 blueParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
         for match in self.quals:
@@ -83,6 +99,7 @@ class Event:
                 redParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
         self.blueMatrix = blueParticipation
         self.redMatrix = redParticipation
+        return(self.blueMatrix,self.redMatrix)
 class Match:
     auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
     def __init__(self, matchKey):
@@ -105,7 +122,15 @@ class Match:
         else:
             self.matchType = 'qm'
             self.matchNo = temp[2:]
+        self.blue = None
+        self.red = None
+        self.blueScore =None
+        self.redScore = None
+        self.winner = None
+        self.happened = None
     def score(self):
+        if self.blue!=None:
+            return(self.blue,self.red,self.blueScore,self.redScore,self.winner,self.happened)
         matchData = TBAPull('match/'+self.matchKey)
         self.blue = [removeFRC(x) for x in matchData["alliances"]['blue']['team_keys']]
         self.red = [removeFRC(x) for x in matchData["alliances"]['blue']['team_keys']]
@@ -116,6 +141,7 @@ class Match:
             self.happened = False
         else:
             self.happened = True
+        return(self.blue,self.red,self.blueScore,self.redScore,self.winner,self.happened)
     def __eq__(self, second):
         if self.eventKey == second.eventKey:
             if self.matchKey == second.matchKey:
@@ -134,11 +160,17 @@ class Match:
             raise Exception('Must be from same event')
 class Team: #more functionality will be added eventually but I'm not sure what
     def __init__(self, number):
-        self.number = number
+        if str(number)[:3]=='frc':
+            self.number = removeFRC(number)
+        else:
+            self.number = number
     def __eq__(self, second):
         return(self.number==second.number)
     def __lt__(self, second):
         return(self.number<second.number)
     def events(self, year): #generates dict of event key name pairs for a given year
+        if eventList!=None:
+            return(eventList)
         eventList = TBAPull('team/frc'+str(self.number)+'/events/'+str(year)+'/simple')
         self.eventList = dict([(event['key'],event['name']) for event in eventList])
+        return(eventList)
