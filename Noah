@@ -4,8 +4,9 @@ import time
 from scipy import linalg
 import requests
 import json
+#authorization key needed touse TBA API
 auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
-def removeFRC(teamKey):
+def removeFRC(teamKey): # converts teram keys like 'frc948' to 948 to make it so stuff sorts properly later
     return int(teamKey[3:])
 def removeNewLine(string): #converts JSON of <something> keys API to a python data
     return(json.loads(string[2:len(string)-1].replace('\\n','').replace("\\",'')))
@@ -63,39 +64,35 @@ class Event:
         self.noTeams = len(teamsList)
     def matches(self):
         allMatches = TBAPull('event/'+self.eventKey+'/matches/keys')
-        quals = []
-        finals = []
-        for match in allMatches:
-            if 'f' in matches:
-                pass
-                finals.append(match(match))
-            else:
-                quals.append(match(match))
+        quals = [Match(match) for match in allMatches if 'f' not in match]
+        finals = [Match(match) for match in allMatches if 'f' in match]
         self.quals = quals
         self.finals = finals
     #def participation(self):
 class Match:
     auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
     def __init__(self, matchKey):
-        matchData = TBAPull('match/'+matchKey)
+        self.matchKey = matchKey
         split = matchKey.split('_')
         #rename temp
         temp = split[1]
+        self.eventKey = split[0]
         #the handling of these case feels really awful
         if 'sf' in temp:
             self.matchType = 'sf'
             self.matchNo = temp[2:]
         elif 'qf' in temp:
-            self.matchType = 'sf'
+            self.matchType = 'qf'
             self.matchNo = temp[2:]
             
         elif 'f' in temp:
             self.matchType = 'f'
             self.matchNo = temp[1:]
         else:
-            self.matchType = 'qf'
+            self.matchType = 'qm'
             self.matchNo = temp[2:]
-        self.eventKey = split[0]
+    def score(self):
+        matchData = TBAPull('match/'+self.matchKey)
         self.blue = [removeFRC(x) for x in matchData["alliances"]['blue']['team_keys']]
         self.red = [removeFRC(x) for x in matchData["alliances"]['blue']['team_keys']]
         self.blueScore = matchData['score_breakdown']['blue']
@@ -104,4 +101,3 @@ class Match:
             self.happened = False
         else:
             self.happened = True
-
