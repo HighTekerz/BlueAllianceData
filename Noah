@@ -119,3 +119,13 @@ class Match:
                 raise Exception('Comparison between match types of ther than qualifiers not implemented')
         else:
             raise Exception('Must be from same event')
+class Team: #more functionality will be added eventually but I'm not sure what
+    def __init__(self, number):
+        self.number = number
+    def __eq__(self, second):
+        return(self.number==second.number)
+    def __lt__(self, second):
+        return(self.number<second.number)
+    def events(self, year): #generates dict of event key name pairs for a given year
+        eventList = TBAPull('team/frc'+str(self.number)+'/events/'+str(year)+'/simple')
+        self.eventList = dict([(event['key'],event['name']) for event in eventList])
