@@ -4,6 +4,8 @@ import time
 from scipy import linalg
 import requests
 import json
+#BIG THING PAY ATTENTION NOAH, at some point we need to actually finalize what we want methods to return
+#or should they be void methods
 #authorization key needed touse TBA API
 auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
 def removeFRC(teamKey): # converts teram keys like 'frc948' to 948 to make it so stuff sorts properly later
@@ -18,28 +20,28 @@ class Event:
     metrics = {2018:{},
                2019:{'adjustPoints':'misc',
                      'autoPoints':'nonContensted',
-                     'bay1':'misc',
-                     'bay2':'misc',
-                     'bay3':'misc',
-                     'bay4':'misc',
-                     'bay5':'misc',
-                     'bay6':'misc',
-                     'bay7':'misc',
-                     'bay8':'misc',
+                     'bay1':'alliance',
+                     'bay2':'alliance',
+                     'bay3':'alliance',
+                     'bay4':'alliance',
+                     'bay5':'alliance',
+                     'bay6':'alliance',
+                     'bay7':'alliance',
+                     'bay8':'alliance',
                      'cargoPoints':'alliance',
                      'completeRocketRankingPoint':'rp',
                      'completedRocketFar':'rp',
                      'completedRocketNear':'rp',
-                     'endgameRobot1':'nonContested',
-                     'endgameRobot2':'nonContested',
-                     'endgameRobot3':'nonContested',
+                     'endgameRobot1':'team',
+                     'endgameRobot2':'team',
+                     'endgameRobot3':'team',
                      'foulCount':'foul',
                      'foulPoints':'foul',
                      'habClimbPoints':'nonContested',
                      'habDockingRankingPoint':'rp',
-                     'habLineRobot1':'nonContested',
-                     'habLineRobot2':'nonContested',
-                     'habLineRobot3':'nonContested',
+                     'habLineRobot1':'team',
+                     'habLineRobot2':'team',
+                     'habLineRobot3':'team',
                      'hatchPanelPoints':'alliance',
                      'lowLeftRocketFar':'alliance',
                      'lowLeftRocketNear':'alliance',
@@ -55,9 +57,9 @@ class Event:
                      'preMatchBay6':'misc',
                      'preMatchBay7':'misc',
                      'preMatchBay8':'misc',
-                     'preMatchLevelRobot1':'nonContested',
-                     'preMatchLevelRobot2':'nonContested',
-                     'preMatchLevelRobot3':'nonContested',
+                     'preMatchLevelRobot1':'team',
+                     'preMatchLevelRobot2':'team',
+                     'preMatchLevelRobot3':'team',
                      'rp':'rp',
                      'sandStormBonusPoints':'nonContested',
                      'techFoulCount':'foul',
@@ -104,10 +106,22 @@ class Event:
                      'totalPoints': 'alliance'
                     }
               }
-    #converts boolean data from TBA to numbers
+    #converts data typed as a string from TBA to the point value it represents
     #can't fill out until I know what the possible responses for 2020 are
+    #need to decide an efficent way to encode which things in this correspond to which metrics
     tbaTranslation = {2018:{'climbToPoint':{'None':0, 'Levitate':0, 'Parking':5,'Climbing':30, 'Unknown':0},'autoRunToPoints':{'None':0, 'AutoRun':5}},
-                      2019:{'endPoints':{'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':12},'bayToPoints':{'None':0,'Panel':2,'PanelAndCargo':5},'preBayToPoints':{'Cargo':0,'Panel':2},'preLevelToPoints':{'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':6},'lineToPoints':{'None':0,'CrossedHabLineInSandstorm':1}},
+                      2019:{'endgameRobot':
+                            {'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':12},
+                            'bay':
+                            {'None':0,'Panel':2,'PanelAndCargo':5},
+                            'Rocket':
+                            {'None':0,'Panel':2,'PanelAndCargo':5},
+                            'preMatchBay':
+                            {'Cargo':0,'Panel':2},
+                            'preMatchLevelRobot':
+                            {'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':6},
+                            'habLineRobot':
+                            {'None':0,'CrossedHabLineInSandstorm':1}},
                       2020:{}
                      }
     def __init__(self, year, key):
@@ -138,6 +152,12 @@ class Event:
         self.blueMatrix = None
         self.redMatrix = None
         self.rawMetrics = None
+        self.RawRed = None
+        self.RawBlue = None
+        self.nonContestedMatrix = None
+        self.contestedMatrix = None
+        self.nonContestedInverse = None
+        self.contestedInverse = None
     def teams(self):
         if self.noTeams!=None:
             return(self.teamsList,self.noTeams)
@@ -159,7 +179,7 @@ class Event:
         self.finals = finals
         return(self.quals,self.finals,self.noQuals)
     def participation(self): #creates incidence matrix for teams and events
-        if self.blueMatrix!=None:
+        if type(self.blueMatrix)!=type(None):
             return(self.blueMatrix,self.redMatrix)
         #todo, determine whether any teams were absent
         self.matches()
@@ -175,29 +195,62 @@ class Event:
                 redParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
         self.blueMatrix = blueParticipation
         self.redMatrix = redParticipation
+        self.nonContestedMatrix = np.concatenate((blueParticipation,redParticipation))
+        self.contestedMatrix = np.concatenate((self.nonContestedMatrix,
+                                               np.concatenate((-redParticipation,-blueParticipation))),
+                                              axis=1)
         return(self.blueMatrix,self.redMatrix)
+    def inverse(self):
+        if type(self.nonContestedInverse)!=type(None):
+            return(self.contestedInverse,self.nonContestedInverse)
+        self.participation()
+        self.contestedInverse = np.linalg.pinv(self.contestedMatrix)
+        self.nonContestedInverse = np.linalg.pinv(self.nonContestedMatrix)
+        return(self.contestedInverse,self.nonContestedInverse)
     def raw(self): #creates array of arrays containing raw metric values for all matches
         if self.rawMetrics!=None:
             return(self.rawMetrics)
         self.matches()
         self.teams()
+        #can't use np array for this since that only supports numerical types as entries :(
         RawBlue = []
         RawRed = []
         for match in self.quals:
             match.score()
             RawBlue.append(list(match.rawBlue.values()))
             RawRed.append(list(match.rawRed.values()))
-        self.rawMetrics = [RawBlue, RawRed]
-        return(self.rawMetrics)
+        self.RawBlue = RawBlue
+        self.RawRed = RawRed
+        self.rawMetrics = RawBlue+RawRed
+        return(self.RawBlue,self.RawRed)
     #don't like this name, night change before final
     def processing(self, metric):
         if metric not in self.metricKeys:
             raise Exception('Not a valid metric for this year, check TBA for metrics')
+        metricIndex = self.metricKeys.index(metric)
         metricType = self.allMetrics[metric]
+        self.raw()
+        for reg in self.tbaTranslation:
+            if reg in metric:
+                points = lambda x: reg[x]
+                break
+        else:
+            points = lambda x: int(x)
+        metricValues = []
+        for match in self.rawMetrics:
+            metricValues.append(points(match[metricIndex]))
         if metricType=='team':
             pass
         elif metricType=='alliance':
-            pass
+            inverse = self.inverse()[0]
+            return(inverse@np.array(metricValues))
+    def opr(self):
+        self.raw()
+        metricValues = []
+        for match in self.rawMetrics:
+            metricValues.append(match[self.metricKeys.index('totalPoints')])
+        inverse = self.inverse()[1]
+        return(inverse@np.array(metricValues))
 class Match:
     def __init__(self, matchKey):
         self.matchKey = matchKey
