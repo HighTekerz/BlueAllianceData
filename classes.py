@@ -15,31 +15,101 @@ def TBAPull(directory): #pulls specific info from tba api and makes it into pyth
 class Event:
     colors = ['blue','red']
     #fill these in for all years later
-    #metrics where alliance partners "shouldn't" have any significant impact such as crossing line in auto 
-    teamMetrics = {2018:[],
-                   2019:[],
-                   2020:['initLineRobot','endgameRobot']
-                  }
-    #sources of points where defence is judged to be moot due to causing
-    nonContestedMetrics = {2018:[],
-                           2019:[],
-                           2020:['autoCellsBottom','autoCellsOuter','autoCellsInner','autoCellPoints','endgameRungIsLevel','adjustPoints','controlPanelPoints','autoPoints','endgamePoints']
-                          }
-    #sources of points where defence could be reasonably played, everything else
-    allianceMetrics = {2018:[],
-                        2019:[],
-                        2020:['teleopCellsBottom','teleopCellsOuter','teleopCellsInner']
-                      }
+    metrics = {2018:{},
+               2019:{'adjustPoints':'misc',
+                     'autoPoints':'nonContensted',
+                     'bay1':'misc',
+                     'bay2':'misc',
+                     'bay3':'misc',
+                     'bay4':'misc',
+                     'bay5':'misc',
+                     'bay6':'misc',
+                     'bay7':'misc',
+                     'bay8':'misc',
+                     'cargoPoints':'alliance',
+                     'completeRocketRankingPoint':'rp',
+                     'completedRocketFar':'rp',
+                     'completedRocketNear':'rp',
+                     'endgameRobot1':'nonContested',
+                     'endgameRobot2':'nonContested',
+                     'endgameRobot3':'nonContested',
+                     'foulCount':'foul',
+                     'foulPoints':'foul',
+                     'habClimbPoints':'nonContested',
+                     'habDockingRankingPoint':'rp',
+                     'habLineRobot1':'nonContested',
+                     'habLineRobot2':'nonContested',
+                     'habLineRobot3':'nonContested',
+                     'hatchPanelPoints':'alliance',
+                     'lowLeftRocketFar':'alliance',
+                     'lowLeftRocketNear':'alliance',
+                     'lowRightRocketFar':'alliance',
+                     'lowRightRocketNear':'alliance',
+                     'midLeftRocketFar':'alliance',
+                     'midLeftRocketNear':'alliance',
+                     'midRightRocketFar':'alliance',
+                     'midRightRocketNear':'alliance',
+                     'preMatchBay1':'misc',
+                     'preMatchBay2':'misc',
+                     'preMatchBay3':'misc',
+                     'preMatchBay6':'misc',
+                     'preMatchBay7':'misc',
+                     'preMatchBay8':'misc',
+                     'preMatchLevelRobot1':'nonContested',
+                     'preMatchLevelRobot2':'nonContested',
+                     'preMatchLevelRobot3':'nonContested',
+                     'rp':'rp',
+                     'sandStormBonusPoints':'nonContested',
+                     'techFoulCount':'foul',
+                     'teleopPoints':'alliance',
+                     'topLeftRocketFar':'alliance',
+                     'topLeftRocketNear':'alliance',
+                     'topRightRocketFar':'alliance',
+                     'topRightRocketNear':'alliance',
+                     'totalPoints':'alliance'
+                    },
+               2020:{'initLineRobot1':'team',
+                     'initLineRobot2':'team',
+                     'initLineRobot3':'team',
+                     'endgameRobot1':'team',
+                     'endgameRobot2':'team',
+                     'endgameRobot3':'team',
+                     'autoCellsBottom':'nonContested',
+                     'autoCellsOuter':'nonContested',
+                     'autoCellsInner':'nonContested',
+                     'teleopCellsBottom':'alliance',
+                     'teleopCellsOuter':'alliance',
+                     'teleopCellsInner':'alliance',
+                     'stage1Activated':'misc',
+                     'stage2Activated':'misc',
+                     'stage3Activated':'misc',
+                     'stage3TargetColor':'misc',
+                     'endgameRungIsLevel':'nonContested',
+                     'autoInitLinePoints':'nonContested',
+                     'autoCellPoints':'nonContested',
+                     'autoPoints':'nonContested',
+                     'teleopPoints':'alliance',
+                     'controlPanelPoints':'nonContested',
+                     'endgamePoints':'nonContested',
+                     'teleopPoints':'alliance',
+                     'shieldOperationalRankingPoint':'rp',
+                     'shieldEnergizedRankingPoint':'rp',
+                     'tba_shieldEnergizedRankingPointFromFoul':'misc',
+                     'tba_numRobotsHanging':'misc',
+                     'foulCount':'foul',
+                     'techFoulCount':'foul',
+                     'adjustPoints':'misc', #still don't know what this is
+                     'foulPoints':'foul',
+                     'rp':'rp',
+                     'totalPoints': 'alliance'
+                    }
+              }
     #converts boolean data from TBA to numbers
     #can't fill out until I know what the possible responses for 2020 are
     tbaTranslation = {2018:{'climbToPoint':{'None':0, 'Levitate':0, 'Parking':5,'Climbing':30, 'Unknown':0},'autoRunToPoints':{'None':0, 'AutoRun':5}},
                       2019:{'endPoints':{'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':12},'bayToPoints':{'None':0,'Panel':2,'PanelAndCargo':5},'preBayToPoints':{'Cargo':0,'Panel':2},'preLevelToPoints':{'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':6},'lineToPoints':{'None':0,'CrossedHabLineInSandstorm':1}},
                       2020:{}
                      }
-    weights = {2018:[0, 2, 2, 1, 1, 1, -1, 1, 1],
-               2019:[1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,-1,-1,-1,-1,-1,-1,-1,-1,1,1,1,1,0,0,-1,0,0,1,0,1],
-               2020:[ ]
-              }
     def __init__(self, year, key):
         if type(year)!=int:
             raise Exception('Years are ints')
@@ -49,11 +119,16 @@ class Event:
             raise Exception('Key must be string')
         #add something to make sure the year key combo is valid
         self.eventKey = str(year)+key
-        self.nonContestedMetrics = self.nonContestedMetrics[year]
-        self.allianceMetrics = self.allianceMetrics[year]
-        self.teamMetrics = self.teamMetrics[year]
+        self.allMetrics = self.metrics[year]
+        self.metricKeys = list(self.metrics[year].keys())
+        self.nonContestedMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='nonContested']
+        self.allianceMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='alliance']
+        self.teamMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='team']
+        self.rpMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='rp']
+        self.miscMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='misc']
+        self.foulMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='foul']
         self.tbaTranslation = self.tbaTranslation[year]
-        self.weights = self.weights[year]
+        #self.weights = self.weights[year]
         #create a bunch of empty variable so i can test if they are none instead of checking if they exist
         self.teamsList = None
         self.noTeams = None
@@ -61,19 +136,20 @@ class Event:
         self.quals = None
         self.finals = None
         self.blueMatrix = None
-        self.redMatrix = None       
+        self.redMatrix = None
+        self.rawMetrics = None
     def teams(self):
         if self.noTeams!=None:
-            return(teamsList, noTeams)
+            return(self.teamsList,self.noTeams)
         teamsPre = TBAPull('event/'+self.eventKey+'/teams/keys')
-        teamsList = [removeFRC(x) for x in teamsPre]
+        teamsList = [Team(x) for x in teamsPre]
         teamsList.sort()
         self.teamsList = teamsList
         self.noTeams = len(teamsList)
         return(self.teamsList,self.noTeams)
     def matches(self):
         if self.noQuals!=None:
-            return(quals,finals,noQuals)
+            return(self.quals,self.finals,self.noQuals)
         allMatches = TBAPull('event/'+self.eventKey+'/matches/keys')
         quals = [Match(match) for match in allMatches if 'f' not in match]
         finals = [Match(match) for match in allMatches if 'f' in match]
@@ -84,7 +160,7 @@ class Event:
         return(self.quals,self.finals,self.noQuals)
     def participation(self): #creates incidence matrix for teams and events
         if self.blueMatrix!=None:
-            return(blueMatrix,redMatrix)
+            return(self.blueMatrix,self.redMatrix)
         #todo, determine whether any teams were absent
         self.matches()
         self.teams()
@@ -100,15 +176,36 @@ class Event:
         self.blueMatrix = blueParticipation
         self.redMatrix = redParticipation
         return(self.blueMatrix,self.redMatrix)
+    def raw(self): #creates array of arrays containing raw metric values for all matches
+        if self.rawMetrics!=None:
+            return(self.rawMetrics)
+        self.matches()
+        self.teams()
+        RawBlue = []
+        RawRed = []
+        for match in self.quals:
+            match.score()
+            RawBlue.append(list(match.rawBlue.values()))
+            RawRed.append(list(match.rawRed.values()))
+        self.rawMetrics = [RawBlue, RawRed]
+        return(self.rawMetrics)
+    #don't like this name, night change before final
+    def processing(self, metric):
+        if metric not in self.metricKeys:
+            raise Exception('Not a valid metric for this year, check TBA for metrics')
+        metricType = self.allMetrics[metric]
+        if metricType=='team':
+            pass
+        elif metricType=='alliance':
+            pass
 class Match:
-    auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
     def __init__(self, matchKey):
         self.matchKey = matchKey
         split = matchKey.split('_')
         #rename temp
         temp = split[1]
         self.eventKey = split[0]
-        #the handling of these case feels really awful
+        #the handling of these case feels really awful, maybe learn regex
         if 'sf' in temp:
             self.matchType = 'sf'
             self.matchNo = temp[2:]
@@ -128,20 +225,26 @@ class Match:
         self.redScore = None
         self.winner = None
         self.happened = None
+        self.rawBlue = None
+        self.rawRed = None
     def score(self):
         if self.blue!=None:
             return(self.blue,self.red,self.blueScore,self.redScore,self.winner,self.happened)
         matchData = TBAPull('match/'+self.matchKey)
-        self.blue = [removeFRC(x) for x in matchData["alliances"]['blue']['team_keys']]
-        self.red = [removeFRC(x) for x in matchData["alliances"]['blue']['team_keys']]
+        #change red and blue to return team objects at some point without breaking stuff
+        self.blue = [Team(x) for x in matchData["alliances"]['blue']['team_keys']]
+        self.red = [Team(x) for x in matchData["alliances"]['blue']['team_keys']]
         self.blueScore = matchData['score_breakdown']['blue']
         self.redScore = matchData['score_breakdown']['red']
         self.winner = matchData['winning_alliance']
+        self.rawRed = matchData['score_breakdown']['red']
+        self.rawBlue = matchData['score_breakdown']['blue']
         if matchData['actual_time']==None:
             self.happened = False
         else:
             self.happened = True
         return(self.blue,self.red,self.blueScore,self.redScore,self.winner,self.happened)
+    #following two things allow me to easily sort matches
     def __eq__(self, second):
         if self.eventKey == second.eventKey:
             if self.matchKey == second.matchKey:
