@@ -122,8 +122,18 @@ class Event:
                             {'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':6},
                             'habLineRobot':
                             {'None':0,'CrossedHabLineInSandstorm':1}},
-                      2020:{}
-                     }
+                      2020:{'endgameRobot':
+                            {'Park':5,'Hang':5,'None':0},
+                            'endgameRung':
+                            {'IsLevel':15,'NotLevel':0},
+                            'initLine':
+                            {'Excited':5,'None':0},
+                            'shield':
+                            {'true':1,'false':0},
+                            'targetColor':
+                            {'lol':10},#idk what to do with this
+                            'stage':
+                            {'true':1,'false':0}}}
     def __init__(self, year, key):
         if type(year)!=int:
             raise Exception('Years are ints')
