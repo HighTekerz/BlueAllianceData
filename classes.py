@@ -235,10 +235,10 @@ class Event:
         for match in self.allMatches:
             match.score()
             for team in match.blue:
-                blueParticipationF[self.matches.getindex(match)][(self.teamsList).index(team)] = 1
+                blueParticipationF[(self.allMatches).index(match)][(self.teamsList).index(team)] = 1
         for match in self.allMatches:
             for team in match.red:
-                redParticipationF[self.matches.getindex(match)][(self.teamsList).index(team)] = 1
+                redParticipationF[(self.allMatches).index(match)][(self.teamsList).index(team)] = 1
         self.blueMatrixF = blueParticipation
         self.redMatrixF = redParticipation
         self.nonContestedMatrixF = np.concatenate((blueParticipation,redParticipation))
@@ -276,7 +276,7 @@ class Event:
             RawRed.append(list(match.rawRed.values()))
         self.RawBlueF = RawBlue
         self.RawRedF = RawRed
-        self.rawMetricsF = RawBlue+RawRed
+        self.rawMetricsF = RawBlueF+RawRedF
     #don't like this name, night change before final
     def processing(self, metric, includeFinals=False):
         if metric not in self.metricKeys:
@@ -314,7 +314,7 @@ class Event:
         scoreValues = []
         for match in self.rawMetricsF:
             scoreValues.append(match[self.metricKeys.index('totalPoints')]) 
-        self.oprF = self.contestedInverseF@scoreValues
+        self.oprF = self.contestedInverseF@scoreValuesF
         
 class Match:
     global matchTypeOrder
