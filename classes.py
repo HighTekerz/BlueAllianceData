@@ -223,7 +223,6 @@ class Event:
             match.score()
             for team in match.blue:
                 blueParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
-        for match in self.quals:
             for team in match.red:
                 redParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
         self.blueMatrix = blueParticipation
@@ -236,14 +235,13 @@ class Event:
             match.score()
             for team in match.blue:
                 blueParticipationF[(self.allMatches).index(match)][(self.teamsList).index(team)] = 1
-        for match in self.allMatches:
             for team in match.red:
                 redParticipationF[(self.allMatches).index(match)][(self.teamsList).index(team)] = 1
-        self.blueMatrixF = blueParticipation
-        self.redMatrixF = redParticipation
-        self.nonContestedMatrixF = np.concatenate((blueParticipation,redParticipation))
-        self.contestedMatrixF = np.concatenate((self.nonContestedMatrix,
-                                               np.concatenate((-redParticipation,-blueParticipation))),
+        self.blueMatrixF = blueParticipationF
+        self.redMatrixF = redParticipationF
+        self.nonContestedMatrixF = np.concatenate((blueParticipationF,redParticipationF))
+        self.contestedMatrixF = np.concatenate((self.nonContestedMatrixF,
+                                               np.concatenate((-redParticipationF,-blueParticipationF))),
                                               axis=1)
         return(self.blueMatrix,self.redMatrix)
     def inverse(self, includeFinals=False):
@@ -270,12 +268,14 @@ class Event:
         self.RawBlue = RawBlue
         self.RawRed = RawRed
         self.rawMetrics = RawBlue+RawRed
-        for match in self.finals:
+        RawBlueF = []
+        RawRedF = []
+        for match in self.allMatches:
             match.score()
-            RawBlue.append(list(match.rawBlue.values()))
-            RawRed.append(list(match.rawRed.values()))
-        self.RawBlueF = RawBlue
-        self.RawRedF = RawRed
+            RawBlueF.append(list(match.rawBlue.values()))
+            RawRedF.append(list(match.rawRed.values()))
+        self.RawBlueF = RawBlueF
+        self.RawRedF = RawRedF
         self.rawMetricsF = RawBlueF+RawRedF
     #don't like this name, night change before final
     def processing(self, metric, includeFinals=False):
@@ -290,31 +290,25 @@ class Event:
                 break
         else:
             points = lambda x: int(javaBoolToPy(x))
-        metricValues = []
         if includeFinals:
             includedMatches = self.rawMetricsF
         else:
             includedMatches = self.rawMetrics
-        for match in includedMatches:
-            metricValues.append(points(match[metricIndex]))
+        metricValues = [includedMatches[x][self.metricKeys.index(metric)] for x in range(self.noTeams)]
         if metricType=='team':
             pass
         elif metricType=='alliance':
             inverse = self.inverse()[0]
             return(inverse@np.array(metricValues))
     def getOPR(self):
-        if self.opr!=None:
+        if type(self.opr)!=type(None):
             return(None)
         self.raw()
         self.inverse()
-        scoreValues = []
-        for match in self.rawMetrics:
-            scoreValues.append(match[self.metricKeys.index('totalPoints')])
-        self.opr = self.contestedInverse@scoreValues
-        scoreValues = []
-        for match in self.rawMetricsF:
-            scoreValues.append(match[self.metricKeys.index('totalPoints')]) 
-        self.oprF = self.contestedInverseF@scoreValuesF
+        scoreValues = [self.rawMetrics[x][self.metricKeys.index('totalPoints')] for x in range(2*self.noQuals)]
+        self.opr = self.nonContestedInverse@scoreValues
+        scoreValuesF = [self.rawMetricsF[x][self.metricKeys.index('totalPoints')] for x in range(2*self.noQuals+2*self.noFinals)]
+        self.oprF = self.nonContestedInverseF@scoreValuesF
         
 class Match:
     global matchTypeOrder
@@ -355,7 +349,7 @@ class Match:
             return(None)
         matchData = TBAPull('match/'+self.matchKey)
         self.blue = [Team(x) for x in matchData["alliances"]['blue']['team_keys']]
-        self.red = [Team(x) for x in matchData["alliances"]['blue']['team_keys']]
+        self.red = [Team(x) for x in matchData["alliances"]['red']['team_keys']]
         self.blueScore = matchData['score_breakdown']['blue']
         self.redScore = matchData['score_breakdown']['red']
         self.winner = matchData['winning_alliance']
