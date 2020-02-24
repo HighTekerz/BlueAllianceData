@@ -4,6 +4,122 @@ import time
 from scipy import linalg
 import requests
 import json
+colors = ['blue','red']
+matchTypeOrder = ['qm','qf','sf','f']
+metrics = {2018:{},
+           2019:{'adjustPoints':'misc',
+                 'autoPoints':'nonContensted',
+                 'bay1':'alliance',
+                 'bay2':'alliance',
+                 'bay3':'alliance',
+                 'bay4':'alliance',
+                 'bay5':'alliance',
+                 'bay6':'alliance',
+                 'bay7':'alliance',
+                 'bay8':'alliance',
+                 'cargoPoints':'alliance',
+                 'completeRocketRankingPoint':'rp',
+                 'completedRocketFar':'rp',
+                 'completedRocketNear':'rp',
+                 'endgameRobot1':'team',
+                 'endgameRobot2':'team',
+                 'endgameRobot3':'team',
+                 'foulCount':'foul',
+                 'foulPoints':'foul',
+                 'habClimbPoints':'nonContested',
+                 'habDockingRankingPoint':'rp',
+                 'habLineRobot1':'team',
+                 'habLineRobot2':'team',
+                 'habLineRobot3':'team',
+                 'hatchPanelPoints':'alliance',
+                 'lowLeftRocketFar':'alliance',
+                 'lowLeftRocketNear':'alliance',
+                 'lowRightRocketFar':'alliance',
+                 'lowRightRocketNear':'alliance',
+                 'midLeftRocketFar':'alliance',
+                 'midLeftRocketNear':'alliance',
+                 'midRightRocketFar':'alliance',
+                 'midRightRocketNear':'alliance',
+                 'preMatchBay1':'misc',
+                 'preMatchBay2':'misc',
+                 'preMatchBay3':'misc',
+                 'preMatchBay6':'misc',
+                 'preMatchBay7':'misc',
+                 'preMatchBay8':'misc',
+                 'preMatchLevelRobot1':'team',
+                 'preMatchLevelRobot2':'team',
+                 'preMatchLevelRobot3':'team',
+                 'rp':'rp',
+                 'sandStormBonusPoints':'nonContested',
+                 'techFoulCount':'foul',
+                 'teleopPoints':'alliance',
+                 'topLeftRocketFar':'alliance',
+                 'topLeftRocketNear':'alliance',
+                 'topRightRocketFar':'alliance',
+                 'topRightRocketNear':'alliance',
+                 'totalPoints':'alliance'
+                },
+           2020:{'initLineRobot1':'team',
+                 'initLineRobot2':'team',
+                 'initLineRobot3':'team',
+                 'endgameRobot1':'team',
+                 'endgameRobot2':'team',
+                 'endgameRobot3':'team',
+                 'autoCellsBottom':'nonContested',
+                 'autoCellsOuter':'nonContested',
+                 'autoCellsInner':'nonContested',
+                 'teleopCellsBottom':'alliance',
+                 'teleopCellsOuter':'alliance',
+                 'teleopCellsInner':'alliance',
+                 'stage1Activated':'misc',
+                 'stage2Activated':'misc',
+                 'stage3Activated':'misc',
+                 'stage3TargetColor':'misc',
+                 'endgameRungIsLevel':'nonContested',
+                 'autoInitLinePoints':'nonContested',
+                 'autoCellPoints':'nonContested',
+                 'autoPoints':'nonContested',
+                 'teleopPoints':'alliance',
+                 'controlPanelPoints':'nonContested',
+                 'endgamePoints':'nonContested',
+                 'teleopPoints':'alliance',
+                 'shieldOperationalRankingPoint':'rp',
+                 'shieldEnergizedRankingPoint':'rp',
+                 'tba_shieldEnergizedRankingPointFromFoul':'misc',
+                 'tba_numRobotsHanging':'misc',
+                 'foulCount':'foul',
+                 'techFoulCount':'foul',
+                 'adjustPoints':'misc', #still don't know what this is
+                 'foulPoints':'foul',
+                 'rp':'rp',
+                 'totalPoints': 'alliance'
+                }
+          }
+tbaTranslation = {2018:{'climbToPoint':{'None':0, 'Levitate':0, 'Parking':5,'Climbing':30, 'Unknown':0},'autoRunToPoints':{'None':0, 'AutoRun':5}},
+                  2019:{'endgameRobot':
+                        {'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':12},
+                        'bay':
+                        {'None':0,'Panel':2,'PanelAndCargo':5},
+                        'Rocket':
+                        {'None':0,'Panel':2,'PanelAndCargo':5},
+                        'preMatchBay':
+                        {'Cargo':0,'Panel':2},
+                        'preMatchLevelRobot':
+                        {'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':6},
+                        'habLineRobot':
+                        {'None':0,'CrossedHabLineInSandstorm':1}},
+                  2020:{'endgameRobot':
+                        {'Park':5,'Hang':5,'None':0},
+                        'endgameRung':
+                        {'IsLevel':15,'NotLevel':0},
+                        'initLine':
+                        {'Excited':5,'None':0},
+                        'shield':
+                        {'true':1,'false':0},
+                        'targetColor':
+                        {'lol':10},#idk what to do with this
+                        'stage':
+                        {'true':1,'false':0}}}
 #BIG THING PAY ATTENTION NOAH, at some point we need to actually finalize what we want methods to return
 #or should they be void methods
 #authorization key needed touse TBA API
@@ -12,128 +128,16 @@ def removeFRC(teamKey): # converts teram keys like 'frc948' to 948 to make it so
     return int(teamKey[3:])
 def removeNewLine(string): #converts JSON of <something> keys API to a python data
     return(json.loads(string[2:len(string)-1].replace('\\n','').replace("\\",'')))
+def javaBoolToPy(javaBool):
+    if javaBool=='true':
+        return True
+    return False
 def TBAPull(directory): #pulls specific info from tba api and makes it into python usable format
     return(removeNewLine(str(requests.get('http://www.thebluealliance.com/api/v3/'+directory,headers=auth).content)))
 class Event:
-    colors = ['blue','red']
-    #fill these in for all years later
-    metrics = {2018:{},
-               2019:{'adjustPoints':'misc',
-                     'autoPoints':'nonContensted',
-                     'bay1':'alliance',
-                     'bay2':'alliance',
-                     'bay3':'alliance',
-                     'bay4':'alliance',
-                     'bay5':'alliance',
-                     'bay6':'alliance',
-                     'bay7':'alliance',
-                     'bay8':'alliance',
-                     'cargoPoints':'alliance',
-                     'completeRocketRankingPoint':'rp',
-                     'completedRocketFar':'rp',
-                     'completedRocketNear':'rp',
-                     'endgameRobot1':'team',
-                     'endgameRobot2':'team',
-                     'endgameRobot3':'team',
-                     'foulCount':'foul',
-                     'foulPoints':'foul',
-                     'habClimbPoints':'nonContested',
-                     'habDockingRankingPoint':'rp',
-                     'habLineRobot1':'team',
-                     'habLineRobot2':'team',
-                     'habLineRobot3':'team',
-                     'hatchPanelPoints':'alliance',
-                     'lowLeftRocketFar':'alliance',
-                     'lowLeftRocketNear':'alliance',
-                     'lowRightRocketFar':'alliance',
-                     'lowRightRocketNear':'alliance',
-                     'midLeftRocketFar':'alliance',
-                     'midLeftRocketNear':'alliance',
-                     'midRightRocketFar':'alliance',
-                     'midRightRocketNear':'alliance',
-                     'preMatchBay1':'misc',
-                     'preMatchBay2':'misc',
-                     'preMatchBay3':'misc',
-                     'preMatchBay6':'misc',
-                     'preMatchBay7':'misc',
-                     'preMatchBay8':'misc',
-                     'preMatchLevelRobot1':'team',
-                     'preMatchLevelRobot2':'team',
-                     'preMatchLevelRobot3':'team',
-                     'rp':'rp',
-                     'sandStormBonusPoints':'nonContested',
-                     'techFoulCount':'foul',
-                     'teleopPoints':'alliance',
-                     'topLeftRocketFar':'alliance',
-                     'topLeftRocketNear':'alliance',
-                     'topRightRocketFar':'alliance',
-                     'topRightRocketNear':'alliance',
-                     'totalPoints':'alliance'
-                    },
-               2020:{'initLineRobot1':'team',
-                     'initLineRobot2':'team',
-                     'initLineRobot3':'team',
-                     'endgameRobot1':'team',
-                     'endgameRobot2':'team',
-                     'endgameRobot3':'team',
-                     'autoCellsBottom':'nonContested',
-                     'autoCellsOuter':'nonContested',
-                     'autoCellsInner':'nonContested',
-                     'teleopCellsBottom':'alliance',
-                     'teleopCellsOuter':'alliance',
-                     'teleopCellsInner':'alliance',
-                     'stage1Activated':'misc',
-                     'stage2Activated':'misc',
-                     'stage3Activated':'misc',
-                     'stage3TargetColor':'misc',
-                     'endgameRungIsLevel':'nonContested',
-                     'autoInitLinePoints':'nonContested',
-                     'autoCellPoints':'nonContested',
-                     'autoPoints':'nonContested',
-                     'teleopPoints':'alliance',
-                     'controlPanelPoints':'nonContested',
-                     'endgamePoints':'nonContested',
-                     'teleopPoints':'alliance',
-                     'shieldOperationalRankingPoint':'rp',
-                     'shieldEnergizedRankingPoint':'rp',
-                     'tba_shieldEnergizedRankingPointFromFoul':'misc',
-                     'tba_numRobotsHanging':'misc',
-                     'foulCount':'foul',
-                     'techFoulCount':'foul',
-                     'adjustPoints':'misc', #still don't know what this is
-                     'foulPoints':'foul',
-                     'rp':'rp',
-                     'totalPoints': 'alliance'
-                    }
-              }
-    #converts data typed as a string from TBA to the point value it represents
-    #can't fill out until I know what the possible responses for 2020 are
-    #need to decide an efficent way to encode which things in this correspond to which metrics
-    tbaTranslation = {2018:{'climbToPoint':{'None':0, 'Levitate':0, 'Parking':5,'Climbing':30, 'Unknown':0},'autoRunToPoints':{'None':0, 'AutoRun':5}},
-                      2019:{'endgameRobot':
-                            {'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':12},
-                            'bay':
-                            {'None':0,'Panel':2,'PanelAndCargo':5},
-                            'Rocket':
-                            {'None':0,'Panel':2,'PanelAndCargo':5},
-                            'preMatchBay':
-                            {'Cargo':0,'Panel':2},
-                            'preMatchLevelRobot':
-                            {'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':6},
-                            'habLineRobot':
-                            {'None':0,'CrossedHabLineInSandstorm':1}},
-                      2020:{'endgameRobot':
-                            {'Park':5,'Hang':5,'None':0},
-                            'endgameRung':
-                            {'IsLevel':15,'NotLevel':0},
-                            'initLine':
-                            {'Excited':5,'None':0},
-                            'shield':
-                            {'true':1,'false':0},
-                            'targetColor':
-                            {'lol':10},#idk what to do with this
-                            'stage':
-                            {'true':1,'false':0}}}
+    global color
+    global tbaTranslation
+    global metrics
     def __init__(self, year, key):
         if type(year)!=int:
             raise Exception('Years are ints')
@@ -143,15 +147,15 @@ class Event:
             raise Exception('Key must be string')
         #add something to make sure the year key combo is valid
         self.eventKey = str(year)+key
-        self.allMetrics = self.metrics[year]
-        self.metricKeys = list(self.metrics[year].keys())
+        self.allMetrics = metrics[year]
+        self.metricKeys = list(metrics[year].keys())
         self.nonContestedMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='nonContested']
         self.allianceMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='alliance']
         self.teamMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='team']
         self.rpMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='rp']
         self.miscMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='misc']
         self.foulMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='foul']
-        self.tbaTranslation = self.tbaTranslation[year]
+        self.tbaTranslation = tbaTranslation[year]
         #self.weights = self.weights[year]
         #create a bunch of empty variable so i can test if they are none instead of checking if they exist
         self.teamsList = None
@@ -168,34 +172,53 @@ class Event:
         self.contestedMatrix = None
         self.nonContestedInverse = None
         self.contestedInverse = None
+        self.noFinals = None
+        self.RawBlueF = None
+        self.RawRedF = None
+        self.rawMetricsF = None
+        self.blueMatrixF = None
+        self.redMatrixF = None
+        self.nonContestedMatrixF = None
+        self.contestedMatrixF = None
+        self.contestedInverseF = None
+        self.nonContestedInverseF = None
+        self.opr = None
+        self.oprF = None
+        self.allMatches = None
+    def __repr__(self):
+        return('Event '+str(self.eventKey))
     def teams(self):
         if self.noTeams!=None:
-            return(self.teamsList,self.noTeams)
+            return(None)
         teamsPre = TBAPull('event/'+self.eventKey+'/teams/keys')
         teamsList = [Team(x) for x in teamsPre]
         teamsList.sort()
         self.teamsList = teamsList
         self.noTeams = len(teamsList)
-        return(self.teamsList,self.noTeams)
     def matches(self):
         if self.noQuals!=None:
-            return(self.quals,self.finals,self.noQuals)
+            return(None)
         allMatches = TBAPull('event/'+self.eventKey+'/matches/keys')
         quals = [Match(match) for match in allMatches if 'f' not in match]
         finals = [Match(match) for match in allMatches if 'f' in match]
         quals.sort()
         self.noQuals = len(quals)
+        self.noFinals = len(finals)
         self.quals = quals
         self.finals = finals
-        return(self.quals,self.finals,self.noQuals)
+        allMatches = quals+finals
+        allMatches.sort()
+        self.allMatches = allMatches
     def participation(self): #creates incidence matrix for teams and events
         if type(self.blueMatrix)!=type(None):
-            return(self.blueMatrix,self.redMatrix)
+            return(None)
         #todo, determine whether any teams were absent
         self.matches()
         self.teams()
         blueParticipation = np.zeros((self.noQuals,self.noTeams))
         redParticipation = np.zeros((self.noQuals,self.noTeams))
+        blueParticipationF = np.zeros((self.noFinals+self.noQuals,self.noTeams))
+        redParticipationF = np.zeros((self.noFinals+self.noQuals,self.noTeams))
         for match in self.quals:
             match.score()
             for team in match.blue:
@@ -209,17 +232,32 @@ class Event:
         self.contestedMatrix = np.concatenate((self.nonContestedMatrix,
                                                np.concatenate((-redParticipation,-blueParticipation))),
                                               axis=1)
+        for match in self.allMatches:
+            match.score()
+            for team in match.blue:
+                blueParticipationF[self.matches.getindex(match)][(self.teamsList).index(team)] = 1
+        for match in self.allMatches:
+            for team in match.red:
+                redParticipationF[self.matches.getindex(match)][(self.teamsList).index(team)] = 1
+        self.blueMatrixF = blueParticipation
+        self.redMatrixF = redParticipation
+        self.nonContestedMatrixF = np.concatenate((blueParticipation,redParticipation))
+        self.contestedMatrixF = np.concatenate((self.nonContestedMatrix,
+                                               np.concatenate((-redParticipation,-blueParticipation))),
+                                              axis=1)
         return(self.blueMatrix,self.redMatrix)
-    def inverse(self):
+    def inverse(self, includeFinals=False):
         if type(self.nonContestedInverse)!=type(None):
-            return(self.contestedInverse,self.nonContestedInverse)
+            return(None)
         self.participation()
         self.contestedInverse = np.linalg.pinv(self.contestedMatrix)
         self.nonContestedInverse = np.linalg.pinv(self.nonContestedMatrix)
+        self.contestedInverseF = np.linalg.pinv(self.contestedMatrixF)
+        self.nonContestedInverseF = np.linalg.pinv(self.nonContestedMatrixF)
         return(self.contestedInverse,self.nonContestedInverse)
     def raw(self): #creates array of arrays containing raw metric values for all matches
         if self.rawMetrics!=None:
-            return(self.rawMetrics)
+            return(None)
         self.matches()
         self.teams()
         #can't use np array for this since that only supports numerical types as entries :(
@@ -232,9 +270,15 @@ class Event:
         self.RawBlue = RawBlue
         self.RawRed = RawRed
         self.rawMetrics = RawBlue+RawRed
-        return(self.RawBlue,self.RawRed)
+        for match in self.finals:
+            match.score()
+            RawBlue.append(list(match.rawBlue.values()))
+            RawRed.append(list(match.rawRed.values()))
+        self.RawBlueF = RawBlue
+        self.RawRedF = RawRed
+        self.rawMetricsF = RawBlue+RawRed
     #don't like this name, night change before final
-    def processing(self, metric):
+    def processing(self, metric, includeFinals=False):
         if metric not in self.metricKeys:
             raise Exception('Not a valid metric for this year, check TBA for metrics')
         metricIndex = self.metricKeys.index(metric)
@@ -245,23 +289,35 @@ class Event:
                 points = lambda x: reg[x]
                 break
         else:
-            points = lambda x: int(x)
+            points = lambda x: int(javaBoolToPy(x))
         metricValues = []
-        for match in self.rawMetrics:
+        if includeFinals:
+            includedMatches = self.rawMetricsF
+        else:
+            includedMatches = self.rawMetrics
+        for match in includedMatches:
             metricValues.append(points(match[metricIndex]))
         if metricType=='team':
             pass
         elif metricType=='alliance':
             inverse = self.inverse()[0]
             return(inverse@np.array(metricValues))
-    def opr(self):
+    def getOPR(self):
+        if self.opr!=None:
+            return(None)
         self.raw()
-        metricValues = []
+        self.inverse()
+        scoreValues = []
         for match in self.rawMetrics:
-            metricValues.append(match[self.metricKeys.index('totalPoints')])
-        inverse = self.inverse()[1]
-        return(inverse@np.array(metricValues))
+            scoreValues.append(match[self.metricKeys.index('totalPoints')])
+        self.opr = self.contestedInverse@scoreValues
+        scoreValues = []
+        for match in self.rawMetricsF:
+            scoreValues.append(match[self.metricKeys.index('totalPoints')]) 
+        self.oprF = self.contestedInverseF@scoreValues
+        
 class Match:
+    global matchTypeOrder
     def __init__(self, matchKey):
         self.matchKey = matchKey
         split = matchKey.split('_')
@@ -269,6 +325,7 @@ class Match:
         temp = split[1]
         self.eventKey = split[0]
         #the handling of these case feels really awful, maybe learn regex
+        #come up with a better way of assigning match numbers to finals matches
         if 'sf' in temp:
             self.matchType = 'sf'
             self.matchNo = temp[2:]
@@ -290,11 +347,13 @@ class Match:
         self.happened = None
         self.rawBlue = None
         self.rawRed = None
+        self.time = None
+    def __repr__(self):
+        return('Match '+str(self.matchKey))
     def score(self):
         if self.blue!=None:
-            return(self.blue,self.red,self.blueScore,self.redScore,self.winner,self.happened)
+            return(None)
         matchData = TBAPull('match/'+self.matchKey)
-        #change red and blue to return team objects at some point without breaking stuff
         self.blue = [Team(x) for x in matchData["alliances"]['blue']['team_keys']]
         self.red = [Team(x) for x in matchData["alliances"]['blue']['team_keys']]
         self.blueScore = matchData['score_breakdown']['blue']
@@ -302,7 +361,8 @@ class Match:
         self.winner = matchData['winning_alliance']
         self.rawRed = matchData['score_breakdown']['red']
         self.rawBlue = matchData['score_breakdown']['blue']
-        if matchData['actual_time']==None:
+        self.time = matchData['actual_time']
+        if self.time==None:
             self.happened = False
         else:
             self.happened = True
@@ -318,10 +378,14 @@ class Match:
             raise Exception('Must be from same event')
     def __lt__(self, second):
         if self.eventKey == second.eventKey:
-            if self.matchType == second.matchType == 'qm':
+            if matchTypeOrder.index(self.matchType)!=matchTypeOrder.index(second.matchType):
+                return(matchTypeOrder.index(self.matchType)<matchTypeOrder.index(second.matchType))
+            elif self.matchType=='qm':
                 return(int(self.matchNo)<int(second.matchNo))
+            elif self.matchNo[1]!=second.matchNo[1]:
+                return(self.matchNo[1]<second.matchNo[1])
             else:
-                raise Exception('Comparison between match types other than qualifiers not implemented')
+                return(self.matchNo[-1]<second.matchNo[-1])
         else:
             raise Exception('Must be from same event')
 class Team: #more functionality will be added eventually but I'm not sure what
@@ -340,3 +404,7 @@ class Team: #more functionality will be added eventually but I'm not sure what
         eventList = TBAPull('team/frc'+str(self.number)+'/events/'+str(year)+'/simple')
         self.eventList = dict([(event['key'],event['name']) for event in eventList])
         return(eventList)
+    def __repr__(self):
+        return('Team '+str(self.number))
+    def __int__(self):
+        return(self.number)
