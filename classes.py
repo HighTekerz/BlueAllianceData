@@ -6,7 +6,17 @@ import requests
 import json
 colors = ['blue','red']
 matchTypeOrder = ['qm','qf','sf','f']
-metrics = {2018:{},
+metrics = {2008:{},
+           2009:{},
+           2010:{},
+           2011:{},
+           2012:{},
+           2013:{},
+           2014:{},
+           2015:{},
+           2016:{},
+           2017:{},
+           2018:{},
            2019:{'adjustPoints':'misc',
                  'autoPoints':'nonContensted',
                  'bay1':'alliance',
@@ -95,7 +105,20 @@ metrics = {2018:{},
                  'totalPoints': 'alliance'
                 }
           }
-tbaTranslation = {2018:{'climbToPoint':{'None':0, 'Levitate':0, 'Parking':5,'Climbing':30, 'Unknown':0},'autoRunToPoints':{'None':0, 'AutoRun':5}},
+tbaTranslation = {2008:{},
+                  2009:{},
+                  2010:{},
+                  2011:{},
+                  2012:{},
+                  2013:{},
+                  2014:{},
+                  2015:{},
+                  2016:{},
+                  2017:{},
+                  2018:{},
+                  2018:{'climbToPoint':
+                        {'None':0, 'Levitate':0, 'Parking':5,'Climbing':30, 'Unknown':0},
+                        'autoRunToPoints':{'None':0, 'AutoRun':5}},
                   2019:{'endgameRobot':
                         {'None':0,'HabLevel1':3,'HabLevel2':6,'HabLevel3':12},
                         'bay':
@@ -126,36 +149,53 @@ tbaTranslation = {2018:{'climbToPoint':{'None':0, 'Levitate':0, 'Parking':5,'Cli
 auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
 def removeFRC(teamKey): # converts teram keys like 'frc948' to 948 to make it so stuff sorts properly later
     return int(teamKey[3:])
-def removeNewLine(string): #converts JSON of <something> keys API to a python data
-    return(json.loads(string[2:len(string)-1].replace('\\n','').replace("\\",'')))
+def JSONProcessing(string): #converts JSON of <something> keys API to a python data
+    string = (string[2:-1].replace('\\n','').replace('\n','').replace("\\",''))
+    #so i think the garbage below deserves an explanation to anyone reading this spaghetti code
+    #basically i was running some code which went through all the events and sorted them to get a match list
+    #in order to do this i need to compare events and to do this i need to make an api pull to /events/{eventKey}
+    #i found that at least one event had a god awful entry in the json with nested ""
+    #however, due to the way python handles "", instead of being a single string with nested ""
+    #it was interpreted as several seperate strings and cause json.loads() to die
+    #to get around this, i found the commas before and after the webcast field
+    #and then i wipe it off the face of the earth 
+    if 'webcasts' in string:
+        webcastStart = string.find('webcasts')
+        priorComma = string.rfind(',',0,webcastStart)
+        websiteStart = string.find('website')
+        followingComma = string.rfind(',',0,websiteStart)
+        string = string[:priorComma]+string[followingComma:]
+    return(json.loads(string))
 def javaBoolToPy(javaBool):
     if javaBool=='true':
         return True
     return False
 def TBAPull(directory): #pulls specific info from tba api and makes it into python usable format
-    return(removeNewLine(str(requests.get('http://www.thebluealliance.com/api/v3/'+directory,headers=auth).content)))
+    return(JSONProcessing(str(requests.get('http://www.thebluealliance.com/api/v3/'+directory,headers=auth).content)))
 class Event:
     global color
     global tbaTranslation
     global metrics
-    def __init__(self, year, key):
-        if type(year)!=int:
+    def __init__(self, eventKey):
+        """if type(year)!=int:
             raise Exception('Years are ints')
         elif year not in range(2019,2021):
             raise Exception('Year not implemented')
         elif type(key)!=str:
-            raise Exception('Key must be string')
+            raise Exception('Key must be string')"""
         #add something to make sure the year key combo is valid
-        self.eventKey = str(year)+key
-        self.allMetrics = metrics[year]
-        self.metricKeys = list(metrics[year].keys())
+        self.eventKey = eventKey
+        self.year = int(eventKey[:4])
+        self.partialKey = eventKey[4:]
+        self.allMetrics = metrics[self.year]
+        self.metricKeys = list(metrics[self.year].keys())
         self.nonContestedMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='nonContested']
         self.allianceMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='alliance']
         self.teamMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='team']
         self.rpMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='rp']
         self.miscMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='misc']
         self.foulMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='foul']
-        self.tbaTranslation = tbaTranslation[year]
+        self.tbaTranslation = tbaTranslation[self.year]
         #self.weights = self.weights[year]
         #create a bunch of empty variable so i can test if they are none instead of checking if they exist
         self.teamsList = None
@@ -166,15 +206,15 @@ class Event:
         self.blueMatrix = None
         self.redMatrix = None
         self.rawMetrics = None
-        self.RawRed = None
-        self.RawBlue = None
+        self.rawRed = None
+        self.rawBlue = None
         self.nonContestedMatrix = None
         self.contestedMatrix = None
         self.nonContestedInverse = None
         self.contestedInverse = None
         self.noFinals = None
-        self.RawBlueF = None
-        self.RawRedF = None
+        self.rawBlueF = None
+        self.rawRedF = None
         self.rawMetricsF = None
         self.blueMatrixF = None
         self.redMatrixF = None
@@ -185,22 +225,32 @@ class Event:
         self.opr = None
         self.oprF = None
         self.allMatches = None
+        self.week = None
+        self.start = None 
+        self.end = None
+        self.eventType = None
+        self.matchData = None
+    def getAll(self):
+        if self.matchData!=None:
+            return(None)
+        self.matchData = TBAPull('event/'+self.eventKey+'/matches')
     def __repr__(self):
         return('Event '+str(self.eventKey))
     def teams(self):
         if self.noTeams!=None:
-            return(None)
+            return(self.teamsList)
         teamsPre = TBAPull('event/'+self.eventKey+'/teams/keys')
         teamsList = [Team(x) for x in teamsPre]
         teamsList.sort()
         self.teamsList = teamsList
         self.noTeams = len(teamsList)
+        return(self.teamsList)
     def matches(self):
         if self.noQuals!=None:
-            return(None)
-        allMatches = TBAPull('event/'+self.eventKey+'/matches/keys')
-        quals = [Match(match) for match in allMatches if 'f' not in match]
-        finals = [Match(match) for match in allMatches if 'f' in match]
+            return(self.allMatches)
+        self.getAll()
+        quals = [Match(match['key']) for match in self.matchData if 'f' not in match['comp_level']]
+        finals = [Match(match['key']) for match in self.matchData if 'f' in match['comp_level']]
         quals.sort()
         self.noQuals = len(quals)
         self.noFinals = len(finals)
@@ -209,18 +259,20 @@ class Event:
         allMatches = quals+finals
         allMatches.sort()
         self.allMatches = allMatches
+        return(self.allMatches)
     def participation(self): #creates incidence matrix for teams and events
         if type(self.blueMatrix)!=type(None):
             return(None)
         #todo, determine whether any teams were absent
         self.matches()
         self.teams()
+        self.getAll()
         blueParticipation = np.zeros((self.noQuals,self.noTeams))
         redParticipation = np.zeros((self.noQuals,self.noTeams))
         blueParticipationF = np.zeros((self.noFinals+self.noQuals,self.noTeams))
         redParticipationF = np.zeros((self.noFinals+self.noQuals,self.noTeams))
         for match in self.quals:
-            match.score()
+            match.score(self)
             for team in match.blue:
                 blueParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
             for team in match.red:
@@ -232,7 +284,7 @@ class Event:
                                                np.concatenate((-redParticipation,-blueParticipation))),
                                               axis=1)
         for match in self.allMatches:
-            match.score()
+            match.score(self)
             for team in match.blue:
                 blueParticipationF[(self.allMatches).index(match)][(self.teamsList).index(team)] = 1
             for team in match.red:
@@ -248,6 +300,7 @@ class Event:
         if type(self.nonContestedInverse)!=type(None):
             return(None)
         self.participation()
+        self.getAll()
         self.contestedInverse = np.linalg.pinv(self.contestedMatrix)
         self.nonContestedInverse = np.linalg.pinv(self.nonContestedMatrix)
         self.contestedInverseF = np.linalg.pinv(self.contestedMatrixF)
@@ -258,25 +311,26 @@ class Event:
             return(None)
         self.matches()
         self.teams()
+        self.getAll()
         #can't use np array for this since that only supports numerical types as entries :(
-        RawBlue = []
-        RawRed = []
+        rawBlue = []
+        rawRed = []
         for match in self.quals:
-            match.score()
-            RawBlue.append(list(match.rawBlue.values()))
-            RawRed.append(list(match.rawRed.values()))
-        self.RawBlue = RawBlue
-        self.RawRed = RawRed
-        self.rawMetrics = RawBlue+RawRed
-        RawBlueF = []
-        RawRedF = []
+            match.score(self)
+            rawBlue.append(list(match.blueScore.values()))
+            rawRed.append(list(match.redScore.values()))
+        self.rawBlue = rawBlue
+        self.rawRed = rawRed
+        self.rawMetrics = rawBlue+rawRed
+        rawBlueF = []
+        rawRedF = []
         for match in self.allMatches:
-            match.score()
-            RawBlueF.append(list(match.rawBlue.values()))
-            RawRedF.append(list(match.rawRed.values()))
-        self.RawBlueF = RawBlueF
-        self.RawRedF = RawRedF
-        self.rawMetricsF = RawBlueF+RawRedF
+            match.score(self)
+            rawBlueF.append(list(match.blueScore.values()))
+            rawRedF.append(list(match.redScore.values()))
+        self.rawBlueF = rawBlueF
+        self.rawRedF = rawRedF
+        self.rawMetricsF = rawBlueF+rawRedF
     #don't like this name, night change before final
     def processing(self, metric, includeFinals=False):
         if metric not in self.metricKeys:
@@ -284,6 +338,7 @@ class Event:
         metricIndex = self.metricKeys.index(metric)
         metricType = self.allMetrics[metric]
         self.raw()
+        self.getAll()
         for reg in self.tbaTranslation:
             if reg in metric:
                 points = lambda x: reg[x]
@@ -305,11 +360,39 @@ class Event:
             return(None)
         self.raw()
         self.inverse()
+        self.getAll()
         scoreValues = [self.rawMetrics[x][self.metricKeys.index('totalPoints')] for x in range(2*self.noQuals)]
         self.opr = self.nonContestedInverse@scoreValues
         scoreValuesF = [self.rawMetricsF[x][self.metricKeys.index('totalPoints')] for x in range(2*self.noQuals+2*self.noFinals)]
         self.oprF = self.nonContestedInverseF@scoreValuesF
-        
+    def info(self, renameThis=None):
+        if self.eventType!=None:
+            return(None)
+        if renameThis==None:
+            eventInfo = TBAPull('event/'+self.eventKey)
+        else:
+            eventInfo=renameThis
+        self.week = eventInfo['week']
+        self.start = eventInfo['start_date']
+        self.end = eventInfo['end_date']
+        self.eventType = eventInfo['event_type']
+    def __eq__(self, second):
+        if type(second)!=Event:
+            return(False)
+        return(self.eventKey==second.eventKey)
+    def __lt__(self, second):
+        self.info()
+        second.info()
+        if self.year!=second.year:
+            return(self.year<second.year)
+        elif self.week!=second.week and self.week!=None and second.week!=None:
+            return(self.week<second.week)
+        elif self.start!=second.start:
+            return(self.start<second.start)
+        elif self.end!=second.end:
+            return(self.end>second.end)
+        else:
+            return(self.partialKey<second.partialKey)
 class Match:
     global matchTypeOrder
     def __init__(self, matchKey):
@@ -339,28 +422,33 @@ class Match:
         self.redScore = None
         self.winner = None
         self.happened = None
-        self.rawBlue = None
-        self.rawRed = None
         self.time = None
     def __repr__(self):
         return('Match '+str(self.matchKey))
-    def score(self):
+    def score(self, fromEvent = None ):
         if self.blue!=None:
             return(None)
-        matchData = TBAPull('match/'+self.matchKey)
+        if fromEvent==None:
+            matchData = TBAPull('match/'+self.matchKey)
+        elif type(fromEvent)==Event:
+            fromEvent.getAll()
+            eventData = fromEvent.matchData
+            for match in eventData:
+                if match['key']==self.matchKey:
+                    matchData = match
+                    break
+        else:
+            raise Exception('Must pass event from which match is from')
         self.blue = [Team(x) for x in matchData["alliances"]['blue']['team_keys']]
         self.red = [Team(x) for x in matchData["alliances"]['red']['team_keys']]
         self.blueScore = matchData['score_breakdown']['blue']
         self.redScore = matchData['score_breakdown']['red']
         self.winner = matchData['winning_alliance']
-        self.rawRed = matchData['score_breakdown']['red']
-        self.rawBlue = matchData['score_breakdown']['blue']
         self.time = matchData['actual_time']
         if self.time==None:
             self.happened = False
         else:
             self.happened = True
-        return(self.blue,self.red,self.blueScore,self.redScore,self.winner,self.happened)
     #following two things allow me to easily sort matches
     def __eq__(self, second):
         if self.eventKey == second.eventKey:
