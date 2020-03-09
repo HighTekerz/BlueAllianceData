@@ -102,7 +102,8 @@ metrics = {2008:{},
                  'adjustPoints':'misc', #still don't know what this is
                  'foulPoints':'foul',
                  'rp':'rp',
-                 'totalPoints': 'alliance'
+                 'totalPoints': 'alliance',
+                 'teleopCellPoints': 'alliance'
                 }
           }
 tbaTranslation = {2008:{},
@@ -132,19 +133,18 @@ tbaTranslation = {2008:{},
                         'habLineRobot':
                         {'None':0,'CrossedHabLineInSandstorm':1}},
                   2020:{'endgameRobot':
-                        {'Park':5,'Hang':5,'None':0},
+                        {'Park':5,'Hang':25,'None':0},
                         'endgameRung':
                         {'IsLevel':15,'NotLevel':0},
                         'initLine':
-                        {'Excited':5,'None':0},
+                        {'Exited':5,'None':0},
                         'shield':
                         {'true':1,'false':0},
                         'targetColor':
-                        {'lol':10},#idk what to do with this
-                        'stage':
-                        {'true':1,'false':0}}}
+                        {'lol':10}}}
 #BIG THING PAY ATTENTION NOAH, at some point we need to actually finalize what we want methods to return
 #or should they be void methods
+#add check to see if stuff has been updated since last check
 #authorization key needed touse TBA API
 auth={'X-TBA-Auth-Key':'WpZWImrGaWBkNJIIbuvmw6CYDDP52XxQf8XrILyI0itHAcZDaGFVn3z72SlRIjF8'}
 def removeFRC(teamKey): # converts teram keys like 'frc948' to 948 to make it so stuff sorts properly later
@@ -158,7 +158,8 @@ def JSONProcessing(string): #converts JSON of <something> keys API to a python d
     #however, due to the way python handles "", instead of being a single string with nested ""
     #it was interpreted as several seperate strings and cause json.loads() to die
     #to get around this, i found the commas before and after the webcast field
-    #and then i wipe it off the face of the earth 
+    #and then i wipe it off the face of the earth
+    #webcastsCount = string.count('webcasts')
     if 'webcasts' in string:
         webcastStart = string.find('webcasts')
         priorComma = string.rfind(',',0,webcastStart)
@@ -188,7 +189,7 @@ class Event:
         self.year = int(eventKey[:4])
         self.partialKey = eventKey[4:]
         self.allMetrics = metrics[self.year]
-        self.metricKeys = list(metrics[self.year].keys())
+        self.metricKeys = sorted(list(metrics[self.year].keys()))
         self.nonContestedMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='nonContested']
         self.allianceMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='alliance']
         self.teamMetrics = [x for x in self.allMetrics if self.allMetrics[x]=='team']
@@ -230,10 +231,15 @@ class Event:
         self.end = None
         self.eventType = None
         self.matchData = None
+        self.foulInverse = None
+        self.foulInverse = None
+        self.foulMatrix = None
+        self.foulMatrixF = None
     def getAll(self):
         if self.matchData!=None:
-            return(None)
+            return(self.matchData)
         self.matchData = TBAPull('event/'+self.eventKey+'/matches')
+        return(self.matchData)
     def __repr__(self):
         return('Event '+str(self.eventKey))
     def teams(self):
@@ -249,8 +255,8 @@ class Event:
         if self.noQuals!=None:
             return(self.allMatches)
         self.getAll()
-        quals = [Match(match['key']) for match in self.matchData if 'f' not in match['comp_level']]
-        finals = [Match(match['key']) for match in self.matchData if 'f' in match['comp_level']]
+        quals = [Match(match['key'], self) for match in self.matchData if 'f' not in match['comp_level']]
+        finals = [Match(match['key'], self) for match in self.matchData if 'f' in match['comp_level']]
         quals.sort()
         self.noQuals = len(quals)
         self.noFinals = len(finals)
@@ -272,19 +278,20 @@ class Event:
         blueParticipationF = np.zeros((self.noFinals+self.noQuals,self.noTeams))
         redParticipationF = np.zeros((self.noFinals+self.noQuals,self.noTeams))
         for match in self.quals:
-            match.score(self)
+            match.score()
             for team in match.blue:
                 blueParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
             for team in match.red:
                 redParticipation[int(match.matchNo)-1][(self.teamsList).index(team)] = 1
         self.blueMatrix = blueParticipation
         self.redMatrix = redParticipation
+        self.foulMatrix = np.concatenate((redParticipation,blueParticipation))
         self.nonContestedMatrix = np.concatenate((blueParticipation,redParticipation))
         self.contestedMatrix = np.concatenate((self.nonContestedMatrix,
                                                np.concatenate((-redParticipation,-blueParticipation))),
                                               axis=1)
         for match in self.allMatches:
-            match.score(self)
+            match.score()
             for team in match.blue:
                 blueParticipationF[(self.allMatches).index(match)][(self.teamsList).index(team)] = 1
             for team in match.red:
@@ -292,11 +299,13 @@ class Event:
         self.blueMatrixF = blueParticipationF
         self.redMatrixF = redParticipationF
         self.nonContestedMatrixF = np.concatenate((blueParticipationF,redParticipationF))
+        self.foulMatrixF = np.concatenate((redParticipationF,blueParticipationF))
         self.contestedMatrixF = np.concatenate((self.nonContestedMatrixF,
                                                np.concatenate((-redParticipationF,-blueParticipationF))),
                                               axis=1)
         return(self.blueMatrix,self.redMatrix)
     def inverse(self, includeFinals=False):
+        #fix inconsistincies with values returned by this method
         if type(self.nonContestedInverse)!=type(None):
             return(None)
         self.participation()
@@ -305,6 +314,8 @@ class Event:
         self.nonContestedInverse = np.linalg.pinv(self.nonContestedMatrix)
         self.contestedInverseF = np.linalg.pinv(self.contestedMatrixF)
         self.nonContestedInverseF = np.linalg.pinv(self.nonContestedMatrixF)
+        self.foulInverse = np.linalg.pinv(self.foulMatrix)
+        self.foulInverseF = np.linalg.pinv(self.foulMatrixF)
         return(self.contestedInverse,self.nonContestedInverse)
     def raw(self): #creates array of arrays containing raw metric values for all matches
         if self.rawMetrics!=None:
@@ -316,7 +327,7 @@ class Event:
         rawBlue = []
         rawRed = []
         for match in self.quals:
-            match.score(self)
+            match.score()
             rawBlue.append(list(match.blueScore.values()))
             rawRed.append(list(match.redScore.values()))
         self.rawBlue = rawBlue
@@ -325,36 +336,89 @@ class Event:
         rawBlueF = []
         rawRedF = []
         for match in self.allMatches:
-            match.score(self)
+            match.score()
             rawBlueF.append(list(match.blueScore.values()))
             rawRedF.append(list(match.redScore.values()))
         self.rawBlueF = rawBlueF
         self.rawRedF = rawRedF
         self.rawMetricsF = rawBlueF+rawRedF
     #don't like this name, night change before final
+    #make method to compute metricValues
     def processing(self, metric, includeFinals=False):
-        if metric not in self.metricKeys:
+        if metric+'1' in self.metricKeys:
+            metricIndex = self.metricKeys.index(metric+'1')
+            metricType = self.allMetrics[metric+'1']
+            self.participation()
+        elif metric not in self.metricKeys:
             raise Exception('Not a valid metric for this year, check TBA for metrics')
-        metricIndex = self.metricKeys.index(metric)
-        metricType = self.allMetrics[metric]
+        else:
+            metricIndex = self.metricKeys.index(metric)
+            metricType = self.allMetrics[metric]
+            if metricType=='Team':
+                metric = metric[:-1]
+                self.participation()
         self.raw()
         self.getAll()
         for reg in self.tbaTranslation:
             if reg in metric:
-                points = lambda x: reg[x]
+                points = lambda x: self.tbaTranslation[reg][x]
                 break
         else:
-            points = lambda x: int(javaBoolToPy(x))
+            points = lambda x: int(x)
         if includeFinals:
             includedMatches = self.rawMetricsF
+            noMatches = len(self.allMatches)
+            matchList = self.allMatches
+            participationMatrix = self.nonContestedMatrixF
         else:
             includedMatches = self.rawMetrics
-        metricValues = [includedMatches[x][self.metricKeys.index(metric)] for x in range(self.noTeams)]
+            noMatches = self.noQuals
+            matchList = self.quals
+            participationMatrix = self.nonContestedMatrix
         if metricType=='team':
-            pass
+            metricValues = []
+            for alliance in range(2):
+                for x in range(noMatches):
+                    teamValues = []
+                    for team in range(3):
+                        teamValues.append(includedMatches[x+alliance*noMatches][metricIndex+team])
+                    metricValues.append(teamValues)
+        else:
+            self.inverse()
+            metricValues = [points(includedMatches[x][metricIndex]) for x in range(2*noMatches)]
+        if metricType=='team':
+            matchesPlayed = [0]*self.noTeams
+            pointTotals = [0]*self.noTeams
+            #make the following more readable later
+            for n in range(noMatches):
+                for m in range(self.noTeams):
+                    team = self.teamsList[m]
+                    for color in range(2):
+                        if participationMatrix[n+color*noMatches][m]==1:
+                            matchesPlayed[m] += 1
+                            if colors[color]=='red':
+                                alliancePosition = matchList[n].red.index(team)
+                            elif colors[color]=='blue':
+                                alliancePosition = matchList[n].blue.index(team)
+                            pointTotals[m] += points(metricValues[n+color*noMatches][alliancePosition])
+            pointAverages = [pointTotals[x]/matchesPlayed[x] for x in range(self.noTeams)]
+            return(pointAverages,metricValues)
         elif metricType=='alliance':
-            inverse = self.inverse()[0]
-            return(inverse@np.array(metricValues))
+            if includeFinals:
+                inverse = self.nonContestedInverseF
+            else:
+                inverse = self.nonContestedInverse
+        elif metricType=='nonContested':
+            if includeFinals:
+                inverse = self.nonContestedInverseF
+            else:
+                inverse = self.nonContestedInverse
+        elif metricType=='foul':
+            if includeFinals:
+                inverse = self.foulInverseF
+            else:
+                inverse = self.foulInverse
+        return(inverse@np.array(metricValues), metricValues)
     def getOPR(self):
         if type(self.opr)!=type(None):
             return(None)
@@ -369,10 +433,10 @@ class Event:
         if self.eventType!=None:
             return(None)
         if renameThis==None:
-            eventInfo = TBAPull('event/'+self.eventKey)
+            eventInfo = TBAPull('event/'+self.eventKey+'/simple')
         else:
             eventInfo=renameThis
-        self.week = eventInfo['week']
+        #self.week = eventInfo['week']
         self.start = eventInfo['start_date']
         self.end = eventInfo['end_date']
         self.eventType = eventInfo['event_type']
@@ -385,8 +449,6 @@ class Event:
         second.info()
         if self.year!=second.year:
             return(self.year<second.year)
-        elif self.week!=second.week and self.week!=None and second.week!=None:
-            return(self.week<second.week)
         elif self.start!=second.start:
             return(self.start<second.start)
         elif self.end!=second.end:
@@ -394,8 +456,9 @@ class Event:
         else:
             return(self.partialKey<second.partialKey)
 class Match:
+    #add check on to parentEvent to make sure it makes sense
     global matchTypeOrder
-    def __init__(self, matchKey):
+    def __init__(self, matchKey,parentEvent=None):
         self.matchKey = matchKey
         split = matchKey.split('_')
         #rename temp
@@ -418,21 +481,23 @@ class Match:
             self.matchNo = temp[2:]
         self.blue = None
         self.red = None
-        self.blueScore =None
+        self.blueScore = None
         self.redScore = None
         self.winner = None
         self.happened = None
         self.time = None
+        self.parentEvent = parentEvent
     def __repr__(self):
         return('Match '+str(self.matchKey))
-    def score(self, fromEvent = None ):
+    def score(self):
         if self.blue!=None:
             return(None)
-        if fromEvent==None:
+        if self.parentEvent==None:
             matchData = TBAPull('match/'+self.matchKey)
-        elif type(fromEvent)==Event:
-            fromEvent.getAll()
-            eventData = fromEvent.matchData
+        elif isinstance(self.parentEvent, Event):
+            #print('please')
+            self.parentEvent.getAll()
+            eventData = self.parentEvent.matchData
             for match in eventData:
                 if match['key']==self.matchKey:
                     matchData = match
